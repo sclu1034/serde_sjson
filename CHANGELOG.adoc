@@ -1,0 +1,14 @@
+= Changelog
+:toc:
+:toclevels: 1
+:idprefix:
+:idseparator: -
+
+== [Unreleased]
+
+== [v0.1.0] - 2022-11-18
+
+=== Added
+
+* initial release
+* serialization
