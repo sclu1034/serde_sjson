@@ -1,0 +1,13 @@
+= Serde SJSON
+:idprefix:
+:idseparator:
+:toc: macro
+:toclevels: 1
+:!toc-title:
+:caution-caption: :fire:
+:important-caption: :exclamtion:
+:note-caption: :paperclip:
+:tip-caption: :bulb:
+:warning-caption: :warning:
+
+A __ser__ialization/__de__serialization library for __Simplified JSON__, specifically, the Bitsquid/Stingray flavor.
