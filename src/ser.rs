@@ -33,7 +33,7 @@ impl Serializer {
 
     fn ensure_top_level_struct(&self) -> Result<()> {
         if self.level == 0 {
-            return Err(Error::new(ErrorCode::ExpectedTopLevelObject, 0, 0));
+            return Err(Error::new(ErrorCode::ExpectedTopLevelObject, 0, 0, None));
         }
 
         Ok(())
