@@ -22,7 +22,7 @@ fn serialize_u64() {
 
     let tests = [u64::MIN, 4, u64::MAX];
     for value in tests {
-        let expected = format!("value = {}\n", value);
+        let expected = format!("value = {value}\n");
         let value = Value { value };
         let actual = to_string(&value).unwrap();
         assert_eq!(actual, expected);
@@ -38,7 +38,7 @@ fn serialize_i64() {
 
     let tests = [i64::MIN, -6, 0, 4, i64::MAX];
     for value in tests {
-        let expected = format!("value = {}\n", value);
+        let expected = format!("value = {value}\n");
         let value = Value { value };
         let actual = to_string(&value).unwrap();
         assert_eq!(actual, expected);
@@ -61,7 +61,7 @@ fn serialize_f64() {
         std::f64::consts::PI,
     ];
     for value in tests {
-        let expected = format!("value = {}\n", value);
+        let expected = format!("value = {value}\n");
         let value = Value { value };
         let actual = to_string(&value).unwrap();
         assert_eq!(actual, expected);
@@ -104,7 +104,7 @@ fn serialize_bool() {
 
     let tests = [true, false];
     for value in tests {
-        let expected = format!("value = {}\n", value);
+        let expected = format!("value = {value}\n");
         let value = Value { value };
         let actual = to_string(&value).unwrap();
         assert_eq!(actual, expected);
@@ -129,7 +129,7 @@ fn serialize_string() {
         ("foo\\bar", "\"foo\\\\bar\""),
     ];
     for (value, expected) in tests {
-        let expected = format!("value = {}\n", expected);
+        let expected = format!("value = {expected}\n");
         let value = Value {
             value: value.to_string(),
         };
@@ -157,7 +157,7 @@ fn serialize_char() {
         ('\'', "\"'\""),
     ];
     for (value, expected) in tests {
-        let expected = format!("value = {}\n", expected);
+        let expected = format!("value = {expected}\n");
         let value = Value {
             value: value.to_string(),
         };
