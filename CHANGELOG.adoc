@@ -6,6 +6,8 @@
 
 == [Unreleased]
 
+== [v0.2.1] - 2022-12-28
+
 === Fixed
 
 - fix serializing Unicode
