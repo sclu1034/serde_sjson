@@ -6,6 +6,10 @@
 
 == [Unreleased]
 
+=== Fixed
+
+- fix serializing Unicode
+
 == [v0.2.0] - 2022-11-25
 
 === Added

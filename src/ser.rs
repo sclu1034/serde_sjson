@@ -121,48 +121,31 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
+
         let needs_escapes =
             v.is_empty() || v.contains([' ', '\n', '\r', '\t', '=', '\'', '"', '\\', '/']);
+
         if needs_escapes {
             self.output += "\"";
 
-            let len = v.len();
-            let chars = v.chars();
-            let mut start = 0;
-
-            for (i, c) in chars.enumerate() {
-                if ('\x20'..='\x7e').contains(&c)
-                    && !['\t', '\n', '\r', '\"', '\\', '/'].contains(&c)
-                {
-                    continue;
-                }
-
-                self.output += &v[start..i];
-                self.output.push('\\');
-
+            for c in v.chars() {
                 match c {
                     '\t' => {
+                        self.output.push('\\');
                         self.output.push('t');
                     }
                     '\n' => {
+                        self.output.push('\\');
                         self.output.push('n');
                     }
                     '\r' => {
+                        self.output.push('\\');
                         self.output.push('r');
-                    }
-                    '\x7f'.. => {
-                        self.output += &format!("u{:4x}", c as u32);
                     }
                     c => {
                         self.output.push(c);
                     }
                 };
-
-                start = i + 1;
-            }
-
-            if start < len {
-                self.output += &v[start..];
             }
 
             self.output += "\"";
