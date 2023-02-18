@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::parser::Token;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(PartialEq)]
@@ -13,6 +15,7 @@ struct ErrorImpl {
     line: u32,
     column: usize,
     fragment: Option<String>,
+    token: Option<Token>,
 }
 
 #[derive(PartialEq)]
@@ -89,11 +92,12 @@ impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Error({:?}, line: {}, column: {}, fragment: {:?})",
+            "Error({:?}, line: {}, column: {}, fragment: {:?}, token: {:?})",
             self.inner.code.to_string(),
             self.inner.line,
             self.inner.column,
             self.inner.fragment,
+            self.inner.token,
         )
     }
 }
@@ -108,6 +112,7 @@ impl serde::de::Error for Error {
             line: 0,
             column: 0,
             fragment: None,
+            token: None,
         });
         Self { inner }
     }
@@ -123,6 +128,7 @@ impl serde::ser::Error for Error {
             line: 0,
             column: 0,
             fragment: None,
+            token: None,
         });
         Self { inner }
     }
@@ -138,6 +144,24 @@ impl Error {
                 line,
                 column,
                 fragment,
+                token: None,
+            }),
+        }
+    }
+    pub(crate) fn with_token(
+        code: ErrorCode,
+        line: u32,
+        column: usize,
+        fragment: Option<String>,
+        token: Token,
+    ) -> Self {
+        Self {
+            inner: Box::new(ErrorImpl {
+                code,
+                line,
+                column,
+                fragment,
+                token: Some(token),
             }),
         }
     }

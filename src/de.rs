@@ -53,6 +53,16 @@ impl<'de> Deserializer<'de> {
             Some(self.input.fragment().to_string()),
         )
     }
+
+    fn error_with_token(&self, code: ErrorCode, token: Token) -> Error {
+        Error::with_token(
+            code,
+            self.input.location_line(),
+            self.input.get_utf8_column(),
+            Some(self.input.fragment().to_string()),
+            token,
+        )
+    }
 }
 
 pub fn from_str<'a, T>(input: &'a str) -> Result<T>
@@ -79,13 +89,15 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return Err(self.error(ErrorCode::ExpectedTopLevelObject));
         }
 
-        match self.next_token()? {
-            Token::Boolean(val) => visitor.visit_bool::<Self::Error>(val),
-            Token::Float(val) => visitor.visit_f64(val),
-            Token::Integer(val) => visitor.visit_i64(val),
-            Token::Null => visitor.visit_unit(),
-            Token::String(val) => visitor.visit_str(&val),
-            _ => Err(self.error(ErrorCode::ExpectedValue)),
+        match self.peek_token()? {
+            Token::Boolean(_) => self.deserialize_bool(visitor),
+            Token::Float(_) => self.deserialize_f64(visitor),
+            Token::Integer(_) => self.deserialize_i64(visitor),
+            Token::Null => self.deserialize_unit(visitor),
+            Token::String(_) => self.deserialize_str(visitor),
+            Token::ArrayStart => self.deserialize_seq(visitor),
+            Token::ObjectStart => self.deserialize_map(visitor),
+            token => Err(self.error_with_token(ErrorCode::ExpectedValue, token)),
         }
     }
 
@@ -730,5 +742,54 @@ render_config = "core/rendering/renderer"
         );
         let actual = from_str::<()>(json);
         assert_eq!(actual, Err(err));
+    }
+
+    #[test]
+    fn deserialize_array() {
+        #[derive(Debug, Default, serde::Deserialize, PartialEq)]
+        struct Data {
+            array: Vec<String>,
+        }
+
+        let expected = Data {
+            array: vec![String::from("foo")],
+        };
+
+        let sjson = r#"
+array = [
+    "foo"
+]
+"#;
+        assert_ok!(Data, expected, sjson);
+    }
+
+    // Regression test for #1 (https://git.sclu1034.dev/lucas/serde_sjson/issues/1)
+    #[test]
+    fn deserialize_dtmt_config() {
+        #[derive(Debug, Default, serde::Deserialize, PartialEq)]
+        struct DtmtConfig {
+            name: String,
+            #[serde(default)]
+            description: String,
+            version: Option<String>,
+        }
+
+        let sjson = r#"
+name = "test-mod"
+description = "A dummy project to test things with"
+version = "0.1.0"
+
+packages = [
+    "packages/test-mod"
+]
+"#;
+
+        let expected = DtmtConfig {
+            name: String::from("test-mod"),
+            description: String::from("A dummy project to test things with"),
+            version: Some(String::from("0.1.0")),
+        };
+
+        assert_ok!(DtmtConfig, expected, sjson);
     }
 }

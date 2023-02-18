@@ -203,6 +203,32 @@ mod test {
         }};
     }
 
+    fn check_parse_result<S: AsRef<str>, T: AsRef<[Token]>>(input: S, tokens: T) {
+        let tokens = tokens.as_ref();
+        let mut remaining = Span::from(input.as_ref());
+        let mut i = 0;
+
+        loop {
+            if remaining.fragment().is_empty() {
+                break;
+            }
+
+            let (span, token) =
+                super::parse_next_token(remaining).expect("failed to parse next token");
+
+            assert_eq!(Some(&token), tokens.get(i));
+
+            remaining = span;
+            i = i + 1;
+        }
+
+        assert_eq!(
+            tokens.len(),
+            i,
+            "tokens to check against were not exhausted"
+        );
+    }
+
     #[test]
     fn parse_optional() {
         assert_ok!("\n", whitespace, "", '\n');
@@ -265,6 +291,7 @@ mod test {
         assert_ok!(r#""foo123""#, delimited_string, "", "foo123");
         assert_ok!(r#""123foo""#, delimited_string, "", "123foo");
         assert_ok!(r#""foo\"bar""#, delimited_string, "", "foo\\\"bar");
+        assert_ok!(r#""foo/bar""#, delimited_string, "", "foo/bar");
 
         assert_err!("foo\"", delimited_string, ErrorKind::Char);
 
@@ -301,5 +328,40 @@ mod test {
     fn parse_block_comment() {
         assert_ok!("/* foo */", block_comment, "", " foo ");
         assert_ok!("/*\n\tfoo\nbar\n*/", block_comment, "", "\n\tfoo\nbar\n");
+    }
+
+    // Regression test for #1 (https://git.sclu1034.dev/lucas/serde_sjson/issues/1)
+    #[test]
+    fn parse_dtmt_config() {
+        let sjson = r#"
+name = "test-mod"
+description = "A dummy project to test things with"
+version = "0.1.0"
+
+packages = [
+    "packages/test-mod"
+]
+"#;
+
+        check_parse_result(
+            sjson,
+            [
+                Token::String(String::from("name")),
+                Token::Equals,
+                Token::String(String::from("test-mod")),
+                Token::String(String::from("description")),
+                Token::Equals,
+                Token::String(String::from("A dummy project to test things with")),
+                Token::String(String::from("version")),
+                Token::Equals,
+                Token::String(String::from("0.1.0")),
+                Token::String(String::from("packages")),
+                Token::Equals,
+                Token::ArrayStart,
+                Token::String(String::from("packages/test-mod")),
+                Token::ArrayEnd,
+                Token::Eof,
+            ],
+        );
     }
 }

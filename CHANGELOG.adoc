@@ -6,6 +6,8 @@
 
 == [Unreleased]
 
+- fix deserialization failing on arrays and objects in some cases
+
 == [v0.2.1] - 2022-12-28
 
 === Fixed
