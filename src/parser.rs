@@ -1,13 +1,11 @@
 use nom::branch::alt;
-use nom::bytes::complete::{escaped, tag, take_until};
-use nom::character::complete::{
-    alpha1, alphanumeric1, char, digit1, none_of, not_line_ending, one_of,
-};
+use nom::bytes::complete::{tag, take_until};
+use nom::character::complete::{alpha1, alphanumeric1, char, digit1, not_line_ending, one_of};
 use nom::combinator::{cut, eof, map, map_res, opt, recognize, value};
 use nom::multi::{many0_count, many1_count};
 use nom::number::complete::double;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
-use nom::IResult;
+use nom::{IResult, Slice};
 use nom_locate::LocatedSpan;
 
 pub(crate) type Span<'a> = LocatedSpan<&'a str>;
@@ -67,14 +65,35 @@ fn identifier(input: Span) -> IResult<Span, &str> {
 }
 
 fn string_content(input: Span) -> IResult<Span, &str> {
-    // TODO: Handle Unicode escapes
-    map(
-        alt((
-            escaped(none_of("\n\\\""), '\\', one_of(r#""rtn\"#)),
-            tag(""),
-        )),
-        |val: Span| *val.fragment(),
-    )(input)
+    let buf = input.fragment();
+    let mut escaped = false;
+    let mut i = 0;
+
+    for (j, ch) in buf.char_indices() {
+        i = j;
+        match ch {
+            '\\' if !escaped => {
+                escaped = true;
+            }
+            '\n' if !escaped => {
+                let err = nom::error::Error {
+                    input: input.slice(j..),
+                    code: nom::error::ErrorKind::Char,
+                };
+                return Err(nom::Err::Error(err));
+            }
+            '"' if !escaped => {
+                return Ok((input.slice(j..), &buf[0..j]));
+            }
+            _ => escaped = false,
+        }
+    }
+
+    let err = nom::error::Error {
+        input: input.slice((i + 1)..),
+        code: nom::error::ErrorKind::Char,
+    };
+    Err(nom::Err::Failure(err))
 }
 
 fn delimited_string(input: Span) -> IResult<Span, &str> {
@@ -291,6 +310,7 @@ mod test {
         assert_ok!(r#""foo123""#, delimited_string, "", "foo123");
         assert_ok!(r#""123foo""#, delimited_string, "", "123foo");
         assert_ok!(r#""foo\"bar""#, delimited_string, "", "foo\\\"bar");
+        assert_ok!(r#""foo\\bar""#, delimited_string, "", "foo\\\\bar");
         assert_ok!(r#""foo/bar""#, delimited_string, "", "foo/bar");
 
         assert_err!("foo\"", delimited_string, ErrorKind::Char);
@@ -363,5 +383,13 @@ packages = [
                 Token::Eof,
             ],
         );
+    }
+
+    // Regression test for #2
+    #[test]
+    fn parse_windows_path() {
+        let text = "C:\\Users\\public\\test.txt";
+        let sjson = format!(r#""{}""#, text);
+        check_parse_result(sjson, [Token::String(String::from(text))]);
     }
 }
