@@ -1,10 +1,10 @@
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
-use nom::character::complete::{alpha1, alphanumeric1, char, digit1, not_line_ending, one_of};
+use nom::character::complete::{char, digit1, none_of, not_line_ending, one_of};
 use nom::combinator::{cut, eof, map, map_res, opt, recognize, value};
-use nom::multi::{many0_count, many1_count};
+use nom::multi::many1_count;
 use nom::number::complete::double;
-use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::{IResult, Slice};
 use nom_locate::LocatedSpan;
 
@@ -57,11 +57,9 @@ fn float(input: Span) -> IResult<Span, f64> {
 }
 
 fn identifier(input: Span) -> IResult<Span, &str> {
-    let leading = alt((alpha1, tag("_")));
-    let trailing = many0_count(alt((alphanumeric1, tag("_"))));
-    let ident = pair(leading, trailing);
-
-    map(recognize(ident), |val: Span| *val.fragment())(input)
+    map(recognize(many1_count(none_of("\" \t\n=:"))), |val: Span| {
+        *val.fragment()
+    })(input)
 }
 
 fn string_content(input: Span) -> IResult<Span, &str> {
@@ -295,10 +293,14 @@ mod test {
         assert_ok!("foo_bar", identifier, "", "foo_bar");
         assert_ok!("_foo", identifier, "", "_foo");
         assert_ok!("foo bar", identifier, " bar", "foo");
+        assert_ok!("123", identifier, "", "123");
+        assert_ok!("1foo", identifier, "", "1foo");
+        assert_ok!("foo-bar", identifier, "", "foo-bar");
+        assert_ok!("foo/bar", identifier, "", "foo/bar");
+        assert_ok!("foo\"", identifier, "\"", "foo");
 
-        assert_err!("123", identifier, ErrorKind::Tag);
-        assert_err!("1foo", identifier, ErrorKind::Tag);
-        assert_err!("\"foo\"", identifier, ErrorKind::Tag);
+        assert_err!("\"foo", identifier, ErrorKind::Many1Count);
+        assert_err!("\"foo\"", identifier, ErrorKind::Many1Count);
     }
 
     #[test]

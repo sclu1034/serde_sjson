@@ -122,10 +122,10 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
 
-        let needs_escapes =
+        let needs_quotes =
             v.is_empty() || v.contains([' ', '\n', '\r', '\t', '=', '\'', '"', '\\', '/']);
 
-        if needs_escapes {
+        if needs_quotes {
             self.output += "\"";
 
             for c in v.chars() {
