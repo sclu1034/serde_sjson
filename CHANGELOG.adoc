@@ -6,6 +6,10 @@
 
 == [Unreleased]
 
+== Fixed
+
+- fix serializing strings containing `:`
+
 == [v0.2.4] - 2023-03-01
 
 == Fixed

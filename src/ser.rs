@@ -123,7 +123,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
         self.ensure_top_level_struct()?;
 
         let needs_quotes =
-            v.is_empty() || v.contains([' ', '\n', '\r', '\t', '=', '\'', '"', '\\', '/']);
+            v.is_empty() || v.contains([' ', '\n', '\r', '\t', '=', '\'', '"', '\\', ':']);
 
         if needs_quotes {
             self.output += "\"";
