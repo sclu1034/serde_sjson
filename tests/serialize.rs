@@ -125,8 +125,15 @@ fn serialize_string() {
         ("foo\nbar", "\"foo\\nbar\""),
         ("foo\r\nbar", "\"foo\\r\\nbar\""),
         ("foo\tbar", "\"foo\\tbar\""),
-        ("foo/bar", "\"foo\\/bar\""),
+        ("foo/bar", "foo/bar"),
         ("foo\\bar", "\"foo\\\\bar\""),
+        // Regression test for #7.
+        ("scripts/mods/test\\new", "\"scripts/mods/test\\\\new\""),
+        // Regression test for #8.
+        (
+            "+002023-03-03T16:42:33.944311860Z",
+            "\"+002023-03-03T16:42:33.944311860Z\"",
+        ),
     ];
     for (value, expected) in tests {
         let expected = format!("value = {expected}\n");
@@ -152,7 +159,7 @@ fn serialize_char() {
         ('\t', "\"\\t\""),
         ('\r', "\"\\r\""),
         ('\\', "\"\\\\\""),
-        ('/', "\"\\/\""),
+        ('/', "/"),
         ('\"', "\"\\\"\""),
         ('\'', "\"'\""),
     ];

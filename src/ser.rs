@@ -142,6 +142,14 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
                         self.output.push('\\');
                         self.output.push('r');
                     }
+                    '"' => {
+                        self.output.push('\\');
+                        self.output.push('"');
+                    }
+                    '\\' => {
+                        self.output.push('\\');
+                        self.output.push('\\');
+                    }
                     c => {
                         self.output.push(c);
                     }

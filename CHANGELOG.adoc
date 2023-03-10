@@ -13,6 +13,7 @@
 == Fixed
 
 - fix serializing strings containing `:`
+- fix serializing certain escaped characters
 
 == [v0.2.4] - 2023-03-01
 
