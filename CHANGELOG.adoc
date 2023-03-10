@@ -6,6 +6,10 @@
 
 == [Unreleased]
 
+== Added
+
+- implement literal strings
+
 == Fixed
 
 - fix serializing strings containing `:`

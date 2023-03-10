@@ -62,6 +62,13 @@ fn identifier(input: Span) -> IResult<Span, &str> {
     })(input)
 }
 
+fn literal_string(input: Span) -> IResult<Span, &str> {
+    map(
+        delimited(tag("\"\"\""), take_until("\"\"\""), tag("\"\"\"")),
+        |val: Span| *val.fragment(),
+    )(input)
+}
+
 fn string_content(input: Span) -> IResult<Span, &str> {
     let buf = input.fragment();
     let mut escaped = false;
@@ -99,7 +106,7 @@ fn delimited_string(input: Span) -> IResult<Span, &str> {
 }
 
 fn string(input: Span) -> IResult<Span, &str> {
-    alt((identifier, delimited_string))(input)
+    alt((identifier, literal_string, delimited_string))(input)
 }
 
 fn line_comment(input: Span) -> IResult<Span, &str> {
@@ -335,6 +342,41 @@ mod test {
                 Err(Err::Failure(Error::new(
                     unsafe { Span::new_from_raw_offset(4, 1, "\nbar\"", ()) },
                     ErrorKind::Char
+                )))
+            );
+        }
+    }
+
+    #[test]
+    fn parse_literal_string() {
+        assert_ok!(r#""""""""#, literal_string, "", "");
+        assert_ok!(r#""""foo""""#, literal_string, "", "foo");
+        assert_ok!(r#""""foo"""""#, literal_string, "\"", "foo");
+        assert_ok!(r#"""""foo""""#, literal_string, "", "\"foo");
+        assert_ok!(r#""""\n""""#, literal_string, "", "\\n");
+
+        {
+            let raw = r#"
+This is a lengthy description!
+
+It contains line breaks.
+
+Escape sequences, like \n and \t, are parsed literally.
+"Quoted strings are fine", so are two sucessive quotes: "".
+"#;
+
+            let input = format!(r#""""{}""""#, raw);
+
+            assert_ok!(input.as_str(), literal_string, "", raw);
+        }
+
+        {
+            let input = Span::from(r#"""""""#);
+            assert_eq!(
+                literal_string(input),
+                Err(Err::Error(Error::new(
+                    unsafe { Span::new_from_raw_offset(3, 1, "\"\"", ()) },
+                    ErrorKind::TakeUntil
                 )))
             );
         }
