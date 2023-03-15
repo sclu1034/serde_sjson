@@ -39,7 +39,9 @@ fn null(input: Span) -> IResult<Span, ()> {
 }
 
 fn separator(input: Span) -> IResult<Span, &str> {
-    map(alt((tag(","), tag("\n"))), |val: Span| *val.fragment())(input)
+    map(alt((tag(","), tag("\n"), tag("\r\n"))), |val: Span| {
+        *val.fragment()
+    })(input)
 }
 
 fn bool(input: Span) -> IResult<Span, bool> {
@@ -435,5 +437,22 @@ packages = [
         let text = "C:\\Users\\public\\test.txt";
         let sjson = format!(r#""{}""#, text);
         check_parse_result(sjson, [Token::String(String::from(text))]);
+    }
+
+    // Regression test for #10
+    #[test]
+    fn parse_crlf_separator() {
+        let sjson = "foo = 1\r\nbar = 2";
+        check_parse_result(
+            sjson,
+            [
+                Token::String(String::from("foo")),
+                Token::Equals,
+                Token::Integer(1),
+                Token::String(String::from("bar")),
+                Token::Equals,
+                Token::Integer(2),
+            ],
+        );
     }
 }
