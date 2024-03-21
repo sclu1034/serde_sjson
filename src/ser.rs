@@ -1,36 +1,75 @@
+use std::io;
+
 use serde::Serialize;
 
 use crate::error::{Error, ErrorCode, Result};
 
 // TODO: Make configurable
-const INDENT: &str = "  ";
+const INDENT: [u8; 2] = [0x20, 0x20];
 
-pub struct Serializer {
+pub struct Serializer<W> {
     // The current indentation level
     level: usize,
-    // The output string
-    output: String,
+    writer: W,
 }
 
+#[inline]
+pub fn to_writer<T, W>(writer: &mut W, value: &T) -> Result<()>
+where
+    W: io::Write,
+    T: Serialize,
+{
+    let mut serializer = Serializer::new(writer);
+    value.serialize(&mut serializer)
+}
+
+#[inline]
+pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
+where
+    T: Serialize,
+{
+    let mut vec = Vec::with_capacity(128);
+    to_writer(&mut vec, value)?;
+    Ok(vec)
+}
+
+#[inline]
 pub fn to_string<T>(value: &T) -> Result<String>
 where
     T: Serialize,
 {
-    let mut serializer = Serializer {
-        level: 0,
-        output: String::new(),
+    let vec = to_vec(value)?;
+    let string = if cfg!(debug_assertions) {
+        String::from_utf8(vec).expect("We do not emit invalid UTF-8")
+    } else {
+        unsafe { String::from_utf8_unchecked(vec) }
     };
-    value.serialize(&mut serializer)?;
-    Ok(serializer.output)
+    Ok(string)
 }
 
-impl Serializer {
-    fn add_indent(&mut self) {
-        for _ in 0..self.level.saturating_sub(1) {
-            self.output += INDENT;
-        }
+impl<W> Serializer<W>
+where
+    W: io::Write,
+{
+    pub fn new(writer: W) -> Self {
+        Self { level: 0, writer }
     }
 
+    #[inline]
+    fn write(&mut self, bytes: impl AsRef<[u8]>) -> Result<()> {
+        self.writer.write_all(bytes.as_ref()).map_err(Error::from)
+    }
+
+    #[inline]
+    fn add_indent(&mut self) -> Result<()> {
+        for _ in 0..self.level.saturating_sub(1) {
+            self.write(INDENT)?;
+        }
+
+        Ok(())
+    }
+
+    #[inline]
     fn ensure_top_level_struct(&self) -> Result<()> {
         if self.level == 0 {
             return Err(Error::new(ErrorCode::ExpectedTopLevelObject, 0, 0, None));
@@ -40,7 +79,10 @@ impl Serializer {
     }
 }
 
-impl<'a> serde::ser::Serializer for &'a mut Serializer {
+impl<'a, W> serde::ser::Serializer for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -54,7 +96,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
-        self.output += if v { "true" } else { "false" };
+        self.write(if v { "true" } else { "false" })?;
         Ok(())
     }
 
@@ -72,8 +114,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
-        self.output += &v.to_string();
-        Ok(())
+        self.serialize_str(&format!("{}", v))
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok> {
@@ -90,33 +131,25 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
-        self.output += &v.to_string();
-        Ok(())
+        self.serialize_str(&format!("{}", v))
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok> {
-        if v.is_finite() {
-            self.serialize_f64(v.into())
-        } else {
-            self.ensure_top_level_struct()?;
-            self.output += "null";
-            Ok(())
-        }
+        self.serialize_f64(v.into())
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
-        if v.is_finite() {
-            self.output += &v.to_string();
-        } else {
-            self.output += "null";
+        if !v.is_finite() {
+            return Err(Error::new(ErrorCode::NonFiniteFloat, 0, 0, None));
         }
-        Ok(())
+
+        self.serialize_str(&format!("{}", v))
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok> {
         let mut buf = [0; 4];
-        self.serialize_str(v.encode_utf8(&mut buf))
+        self.serialize_bytes(v.encode_utf8(&mut buf).as_bytes())
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
@@ -126,45 +159,52 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
             v.is_empty() || v.contains([' ', '\n', '\r', '\t', '=', '\'', '"', '\\', ':']);
 
         if needs_quotes {
-            self.output += "\"";
+            self.write(b"\"")?;
 
+            // Since we've added a layer of quotes, we now need to escape
+            // certain characters.
             for c in v.chars() {
                 match c {
                     '\t' => {
-                        self.output.push('\\');
-                        self.output.push('t');
+                        self.write(b"\\")?;
+                        self.write(b"t")?;
                     }
                     '\n' => {
-                        self.output.push('\\');
-                        self.output.push('n');
+                        self.write(b"\\")?;
+                        self.write(b"n")?;
                     }
                     '\r' => {
-                        self.output.push('\\');
-                        self.output.push('r');
+                        self.write(b"\\")?;
+                        self.write(b"r")?;
                     }
                     '"' => {
-                        self.output.push('\\');
-                        self.output.push('"');
+                        self.write(b"\\")?;
+                        self.write(b"\"")?;
                     }
                     '\\' => {
-                        self.output.push('\\');
-                        self.output.push('\\');
+                        self.write(b"\\")?;
+                        self.write(b"\\")?;
                     }
                     c => {
-                        self.output.push(c);
+                        self.serialize_char(c)?;
                     }
                 };
             }
 
-            self.output += "\"";
+            self.write(b"\"")?;
         } else {
-            self.output += v;
+            self.write(v.as_bytes())?;
         }
+
         Ok(())
     }
 
-    fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok> {
-        todo!()
+    fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {
+        self.ensure_top_level_struct()?;
+        // For now we assume that the byte array contains
+        // valid SJSON.
+        // TODO: Turn this into an actual array of encoded bytes.
+        self.write(v)
     }
 
     fn serialize_none(self) -> Result<Self::Ok> {
@@ -184,8 +224,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
     fn serialize_unit(self) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
-        self.output += "null";
-        Ok(())
+        self.write(b"null")
     }
 
     fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok> {
@@ -223,19 +262,18 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
     {
         self.ensure_top_level_struct()?;
 
-        self.output += "{ ";
+        self.write(b"{ ")?;
         variant.serialize(&mut *self)?;
-        self.output += " = ";
+        self.write(b" = ")?;
         value.serialize(&mut *self)?;
-        self.output += " }\n";
-        Ok(())
+        self.write(b" }")
     }
 
     // Serialize the start of a sequence.
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
         self.ensure_top_level_struct()?;
 
-        self.output += "[\n";
+        self.write(b"[\n")?;
         self.level += 1;
         Ok(self)
     }
@@ -266,7 +304,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
         variant.serialize(&mut *self)?;
 
-        self.output += " = [\n";
+        self.write(b" = [\n")?;
         self.level += 1;
 
         Ok(self)
@@ -274,7 +312,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         if self.level > 0 {
-            self.output += "{\n";
+            self.write(b"{\n")?;
         }
         self.level += 1;
         Ok(self)
@@ -296,7 +334,7 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
 
         variant.serialize(&mut *self)?;
 
-        self.output += " = {\n";
+        self.write(b" = {\n")?;
         self.level += 1;
 
         Ok(self)
@@ -310,7 +348,10 @@ impl<'a> serde::ser::Serializer for &'a mut Serializer {
     }
 }
 
-impl<'a> serde::ser::SerializeSeq for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeSeq for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -318,23 +359,22 @@ impl<'a> serde::ser::SerializeSeq for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         self.level -= 1;
-        self.add_indent();
-        self.output += "]\n";
-        Ok(())
+        self.add_indent()?;
+        self.write(b"]")
     }
 }
 
-impl<'a> serde::ser::SerializeTuple for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeTuple for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -342,23 +382,22 @@ impl<'a> serde::ser::SerializeTuple for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         self.level -= 1;
-        self.add_indent();
-        self.output += "]\n";
-        Ok(())
+        self.add_indent()?;
+        self.write(b"]")
     }
 }
 
-impl<'a> serde::ser::SerializeTupleStruct for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeTupleStruct for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -366,23 +405,22 @@ impl<'a> serde::ser::SerializeTupleStruct for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         self.level -= 1;
-        self.add_indent();
-        self.output += "]\n";
-        Ok(())
+        self.add_indent()?;
+        self.write(b"]")
     }
 }
 
-impl<'a> serde::ser::SerializeTupleVariant for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeTupleVariant for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -390,28 +428,31 @@ impl<'a> serde::ser::SerializeTupleVariant for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         self.level -= 1;
-        self.add_indent();
-        self.output += "]\n";
+        self.add_indent()?;
+        self.write(b"]\n")?;
+
         self.level -= 1;
+
         if self.level > 0 {
-            self.add_indent();
-            self.output += "}\n";
+            self.add_indent()?;
+            self.write(b"}")?;
         }
+
         Ok(())
     }
 }
 
-impl<'a> serde::ser::SerializeMap for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeMap for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -419,7 +460,7 @@ impl<'a> serde::ser::SerializeMap for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         key.serialize(&mut **self)
     }
 
@@ -430,25 +471,25 @@ impl<'a> serde::ser::SerializeMap for &'a mut Serializer {
         // It doesn't make a difference where the `=` is added. But doing it here
         // means `serialize_key` is only a call to a different function, which should
         // have greater optimization potential for the compiler.
-        self.output += " = ";
+        self.write(b" = ")?;
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         if self.level > 1 {
             self.level -= 1;
-            self.add_indent();
-            self.output += "}\n";
+            self.add_indent()?;
+            self.write(b"}")?;
         }
         Ok(())
     }
 }
 
-impl<'a> serde::ser::SerializeStruct for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeStruct for &'a mut Serializer<W>
+where
+    W: io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -456,29 +497,29 @@ impl<'a> serde::ser::SerializeStruct for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         key.serialize(&mut **self)?;
 
-        self.output += " = ";
+        self.write(b" = ")?;
 
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         if self.level > 1 {
             self.level -= 1;
-            self.add_indent();
-            self.output += "}\n";
+            self.add_indent()?;
+            self.write(b"}")?;
         }
         Ok(())
     }
 }
 
-impl<'a> serde::ser::SerializeStructVariant for &'a mut Serializer {
+impl<'a, W> serde::ser::SerializeStructVariant for &'a mut Serializer<W>
+where
+    W: std::io::Write,
+{
     type Ok = ();
     type Error = Error;
 
@@ -486,21 +527,18 @@ impl<'a> serde::ser::SerializeStructVariant for &'a mut Serializer {
     where
         T: Serialize,
     {
-        self.add_indent();
+        self.add_indent()?;
         key.serialize(&mut **self)?;
-        self.output += " = ";
+        self.write(b" = ")?;
         value.serialize(&mut **self)?;
-        if !self.output.ends_with('\n') {
-            self.output += "\n";
-        }
-        Ok(())
+        self.write(b"\n")
     }
 
     fn end(self) -> Result<Self::Ok> {
         if self.level > 0 {
             self.level -= 1;
-            self.add_indent();
-            self.output += "}\n";
+            self.add_indent()?;
+            self.write(b"}")?;
         }
         Ok(())
     }

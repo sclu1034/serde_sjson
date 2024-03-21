@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, io};
 
 use crate::parser::Token;
 
@@ -38,6 +38,7 @@ pub(crate) enum ErrorCode {
     ExpectedTopLevelObject,
     ExpectedValue,
     TrailingCharacters,
+    NonFiniteFloat,
 }
 
 impl fmt::Display for ErrorCode {
@@ -64,6 +65,7 @@ impl fmt::Display for ErrorCode {
             ErrorCode::ExpectedTopLevelObject => f.write_str("expected object at the top level"),
             ErrorCode::ExpectedValue => f.write_str("expected a value"),
             ErrorCode::TrailingCharacters => f.write_str("unexpected trailing characters"),
+            ErrorCode::NonFiniteFloat => f.write_str("got infinite floating point number"),
         }
     }
 }
@@ -164,5 +166,11 @@ impl Error {
                 token: Some(token),
             }),
         }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Self::new(ErrorCode::Message(format!("{}", err)), 0, 0, None)
     }
 }
