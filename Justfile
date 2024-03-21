@@ -18,6 +18,9 @@ doc:
 serve-doc port='8000': doc
     python3 -m http.server {{port}} --directory target/doc
 
+release version execute='':
+    cargo release --sign --allow-branch master {{ if execute != "" { '-x' } else { '' } }} {{version}}
+
 coverage *ARGS:
     RUSTFLAGS="-C instrument-coverage" cargo test --tests {{ARGS}} || true
     cargo profdata -- merge -sparse default*.profraw -o {{project}}.profdata
