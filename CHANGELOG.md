@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [1.2.0] - 2024-03-21
+
 ### Added
 
 - publishing to [crates.io](https://crates.io)

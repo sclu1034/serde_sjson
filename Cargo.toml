@@ -1,6 +1,6 @@
 [package]
 name = "serde_sjson"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["Lucas Schwiderski"]
 categories = ["encoding", "parser-implementations"]
 description = "An SJSON serialization file format"
