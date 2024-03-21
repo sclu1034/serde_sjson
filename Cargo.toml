@@ -1,15 +1,27 @@
 [package]
 name = "serde_sjson"
 version = "1.1.0"
+authors = ["Lucas Schwiderski"]
+categories = ["encoding", "parser-implementations"]
+description = "An SJSON serialization file format"
+documentation = "https://docs.rs/serde_sjson"
 edition = "2021"
 keywords = ["serde", "serialization", "sjson"]
-description = "An SJSON serialization file format"
-categories = ["encoding", "parser-implementations"]
+license-file = "LICENSE"
+repository = "https://github.com/sclu1034/serde_sjson"
+exclude = [
+    ".github/",
+    ".ci/",
+    "Justfile"
+]
 
 [dependencies]
-nom = "7.1.3"
-nom_locate = "4.1.0"
-serde = { version = "1.0.154", default-features = false }
+nom = "7"
+nom_locate = "4.1"
+serde = { version = "1.0", default-features = false }
 
 [dev-dependencies]
-serde = { version = "1.0.154", features = ["derive"] }
+serde = { version = "1.0.194", features = ["derive"] }
+
+[badges]
+maintenance = { status = "passively-maintained" }
