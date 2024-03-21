@@ -8,6 +8,8 @@
 
 === Added
 
+- implement serializing into generic `io::Write`
+
 === Fixed
 
 - fix parsing CRLF

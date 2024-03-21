@@ -1,4 +1,4 @@
-use serde_sjson::to_string;
+use serde_sjson::{to_string, Error};
 
 #[test]
 fn serialize_null() {
@@ -81,17 +81,14 @@ fn serialize_non_representable_floats() {
     }
 
     let tests = [std::f64::NAN, std::f64::INFINITY, std::f64::NEG_INFINITY];
-    let expected = String::from("value = null\n");
     for value in tests {
         let value = Value64 { value };
-        let actual = to_string(&value).unwrap();
-        assert_eq!(actual, expected);
+        assert!(to_string(&value).is_err());
     }
     let tests = [std::f32::NAN, std::f32::INFINITY, std::f32::NEG_INFINITY];
     for value in tests {
         let value = Value32 { value };
-        let actual = to_string(&value).unwrap();
-        assert_eq!(actual, expected);
+        assert!(to_string(&value).is_err());
     }
 }
 
