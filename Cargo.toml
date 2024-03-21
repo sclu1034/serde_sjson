@@ -1,6 +1,6 @@
 [package]
 name = "serde_sjson"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 keywords = ["serde", "serialization", "sjson"]
 description = "An SJSON serialization file format"
