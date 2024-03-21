@@ -2,8 +2,11 @@ use std::{fmt, io};
 
 use crate::parser::Token;
 
+/// An alias for a `Result` with `serde_sjson::Error`.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A type encapsulating the different errors that might occurr
+/// during serialization or deserialization.
 #[derive(PartialEq)]
 pub struct Error {
     inner: Box<ErrorImpl>,

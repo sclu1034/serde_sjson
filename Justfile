@@ -1,11 +1,22 @@
 project := "serde_sjson"
 default := "run"
 
+build *ARGS:
+    cargo build {{ARGS}}
+    cargo readme > README.md
+
 run *ARGS:
     cargo run -- {{ARGS}}
 
 test *ARGS:
     cargo test {{ARGS}}
+
+doc:
+    cargo doc --no-deps
+    cargo readme > README.md
+
+serve-doc port='8000': doc
+    python3 -m http.server {{port}} --directory target/doc
 
 coverage *ARGS:
     RUSTFLAGS="-C instrument-coverage" cargo test --tests {{ARGS}} || true

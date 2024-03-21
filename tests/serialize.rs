@@ -1,4 +1,4 @@
-use serde_sjson::{to_string, Error};
+use serde_sjson::to_string;
 
 #[test]
 fn serialize_null() {

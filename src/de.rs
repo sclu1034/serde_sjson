@@ -5,6 +5,7 @@ use serde::Deserialize;
 use crate::error::{Error, ErrorCode, Result};
 use crate::parser::*;
 
+/// A container for deserializing Rust values from SJSON.
 pub struct Deserializer<'de> {
     input: Span<'de>,
     is_top_level: bool,
@@ -12,7 +13,7 @@ pub struct Deserializer<'de> {
 
 impl<'de> Deserializer<'de> {
     #![allow(clippy::should_implement_trait)]
-    pub fn from_str(input: &'de str) -> Self {
+    pub(crate) fn from_str(input: &'de str) -> Self {
         Self {
             input: Span::from(input),
             is_top_level: true,
@@ -65,6 +66,8 @@ impl<'de> Deserializer<'de> {
     }
 }
 
+/// Deserializes an SJSON string to a Rust value.
+#[inline]
 pub fn from_str<'a, T>(input: &'a str) -> Result<T>
 where
     T: Deserialize<'a>,

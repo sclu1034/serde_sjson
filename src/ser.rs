@@ -7,12 +7,14 @@ use crate::error::{Error, ErrorCode, Result};
 // TODO: Make configurable
 const INDENT: [u8; 2] = [0x20, 0x20];
 
+/// A container for serializing Rust values into SJSON.
 pub struct Serializer<W> {
     // The current indentation level
     level: usize,
     writer: W,
 }
 
+/// Serializes a value into a generic `io::Write`.
 #[inline]
 pub fn to_writer<T, W>(writer: &mut W, value: &T) -> Result<()>
 where
@@ -23,6 +25,7 @@ where
     value.serialize(&mut serializer)
 }
 
+/// Serializes a value into a byte vector.
 #[inline]
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
 where
@@ -33,6 +36,7 @@ where
     Ok(vec)
 }
 
+/// Serializes a value into a string.
 #[inline]
 pub fn to_string<T>(value: &T) -> Result<String>
 where
@@ -51,6 +55,7 @@ impl<W> Serializer<W>
 where
     W: io::Write,
 {
+    /// Creates a new `Serializer`.
     pub fn new(writer: W) -> Self {
         Self { level: 0, writer }
     }
