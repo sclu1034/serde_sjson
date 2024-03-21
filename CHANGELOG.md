@@ -1,65 +1,67 @@
-= Changelog
-:toc:
-:toclevels: 1
-:idprefix:
-:idseparator: -
+# Changelog
 
-== [Unreleased]
+<!-- next-header -->
 
-== [v1.1.0] - 2024-03-21
+## [Unreleased] - ReleaseDate
 
-=== Added
+### Added
+
+- publishing to [crates.io](https://crates.io)
+
+## [v1.1.0] - 2024-03-21
+
+### Added
 
 - implement serializing into generic `io::Write`
 
-=== Fixed
+### Fixed
 
 - fix parsing CRLF
 
-== [v1.0.0] - 2023-03-10
+## [v1.0.0] - 2023-03-10
 
-=== Added
+### Added
 
 - implement literal strings
 
-=== Fixed
+### Fixed
 
 - fix serializing strings containing `:`
 - fix serializing certain escaped characters
 
-== [v0.2.4] - 2023-03-01
+## [v0.2.4] - 2023-03-01
 
-=== Fixed
+### Fixed
 
 - fix incorrect parsing of unquoted strings
 
-== [v0.2.3] - 2023-02-24
+## [v0.2.3] - 2023-02-24
 
-=== Fixed
+### Fixed
 
 - support backslashes in delimited strings
 
-== [v0.2.2] - 2023-02-18
+## [v0.2.2] - 2023-02-18
 
-=== Fixed
+### Fixed
 
 - fix deserialization failing on arrays and objects in some cases
 
-== [v0.2.1] - 2022-12-28
+## [v0.2.1] - 2022-12-28
 
-=== Fixed
+### Fixed
 
 - fix serializing Unicode
 
-== [v0.2.0] - 2022-11-25
+## [v0.2.0] - 2022-11-25
 
-=== Added
+### Added
 
 * parsing & deserialization
 
-== [v0.1.0] - 2022-11-18
+## [v0.1.0] - 2022-11-18
 
-=== Added
+### Added
 
 * initial release
 * serialization
