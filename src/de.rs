@@ -421,7 +421,7 @@ impl<'a, 'de: 'a> Separated<'a, 'de> {
     }
 }
 
-impl<'de, 'a> serde::de::SeqAccess<'de> for Separated<'a, 'de> {
+impl<'de> serde::de::SeqAccess<'de> for Separated<'_, 'de> {
     type Error = Error;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>>
@@ -443,7 +443,7 @@ impl<'de, 'a> serde::de::SeqAccess<'de> for Separated<'a, 'de> {
     }
 }
 
-impl<'de, 'a> serde::de::MapAccess<'de> for Separated<'a, 'de> {
+impl<'de> serde::de::MapAccess<'de> for Separated<'_, 'de> {
     type Error = Error;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
@@ -487,7 +487,7 @@ impl<'a, 'de> Enum<'a, 'de> {
     }
 }
 
-impl<'de, 'a> EnumAccess<'de> for Enum<'a, 'de> {
+impl<'de> EnumAccess<'de> for Enum<'_, 'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -505,7 +505,7 @@ impl<'de, 'a> EnumAccess<'de> for Enum<'a, 'de> {
     }
 }
 
-impl<'de, 'a> VariantAccess<'de> for Enum<'a, 'de> {
+impl<'de> VariantAccess<'de> for Enum<'_, 'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<()> {
