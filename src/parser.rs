@@ -4,8 +4,8 @@ use nom::character::complete::{char, digit1, none_of, not_line_ending, one_of};
 use nom::combinator::{cut, eof, map, map_res, opt, recognize, value};
 use nom::multi::many1_count;
 use nom::number::complete::double;
-use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::{IResult, Slice};
+use nom::sequence::{delimited, preceded, terminated};
+use nom::{IResult, Input as _, Parser as _};
 use nom_locate::LocatedSpan;
 
 pub(crate) type Span<'a> = LocatedSpan<&'a str>;
@@ -35,23 +35,25 @@ fn whitespace(input: Span) -> IResult<Span, char> {
 }
 
 fn null(input: Span) -> IResult<Span, ()> {
-    value((), tag("null"))(input)
+    value((), tag("null")).parse(input)
 }
 
 fn separator(input: Span) -> IResult<Span, &str> {
     map(alt((tag(","), tag("\n"), tag("\r\n"))), |val: Span| {
         *val.fragment()
-    })(input)
+    })
+    .parse(input)
 }
 
 fn bool(input: Span) -> IResult<Span, bool> {
-    alt((value(true, tag("true")), value(false, tag("false"))))(input)
+    alt((value(true, tag("true")), value(false, tag("false")))).parse(input)
 }
 
 fn integer(input: Span) -> IResult<Span, i64> {
-    map_res(recognize(tuple((opt(char('-')), digit1))), |val: Span| {
+    map_res(recognize((opt(char('-')), digit1)), |val: Span| {
         val.fragment().parse::<i64>()
-    })(input)
+    })
+    .parse(input)
 }
 
 fn float(input: Span) -> IResult<Span, f64> {
@@ -61,14 +63,16 @@ fn float(input: Span) -> IResult<Span, f64> {
 fn identifier(input: Span) -> IResult<Span, &str> {
     map(recognize(many1_count(none_of("\" \t\n=:"))), |val: Span| {
         *val.fragment()
-    })(input)
+    })
+    .parse(input)
 }
 
 fn literal_string(input: Span) -> IResult<Span, &str> {
     map(
         delimited(tag("\"\"\""), take_until("\"\"\""), tag("\"\"\"")),
         |val: Span| *val.fragment(),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn string_content(input: Span) -> IResult<Span, &str> {
@@ -84,49 +88,51 @@ fn string_content(input: Span) -> IResult<Span, &str> {
             }
             '\n' if !escaped => {
                 let err = nom::error::Error {
-                    input: input.slice(j..),
+                    input: input.take_from(j),
                     code: nom::error::ErrorKind::Char,
                 };
                 return Err(nom::Err::Error(err));
             }
             '"' if !escaped => {
-                return Ok((input.slice(j..), &buf[0..j]));
+                return Ok((input.take_from(j), &buf[0..j]));
             }
             _ => escaped = false,
         }
     }
 
     let err = nom::error::Error {
-        input: input.slice((i + 1)..),
+        input: input.take_from(i + 1),
         code: nom::error::ErrorKind::Char,
     };
     Err(nom::Err::Failure(err))
 }
 
 fn delimited_string(input: Span) -> IResult<Span, &str> {
-    preceded(char('"'), cut(terminated(string_content, char('"'))))(input)
+    preceded(char('"'), cut(terminated(string_content, char('"')))).parse(input)
 }
 
 fn string(input: Span) -> IResult<Span, &str> {
-    alt((identifier, literal_string, delimited_string))(input)
+    alt((identifier, literal_string, delimited_string)).parse(input)
 }
 
 fn line_comment(input: Span) -> IResult<Span, &str> {
     map(
         preceded(tag("//"), alt((not_line_ending, eof))),
         |val: Span| *val.fragment(),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn block_comment(input: Span) -> IResult<Span, &str> {
     map(
         delimited(tag("/*"), take_until("*/"), tag("*/")),
         |val: Span| *val.fragment(),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn comment(input: Span) -> IResult<Span, &str> {
-    alt((line_comment, block_comment))(input)
+    alt((line_comment, block_comment)).parse(input)
 }
 
 fn optional(input: Span) -> IResult<Span, ()> {
@@ -135,7 +141,7 @@ fn optional(input: Span) -> IResult<Span, ()> {
     let empty = value((), tag(""));
     let content = value((), many1_count(alt((whitespace, comment))));
 
-    alt((content, empty))(input)
+    alt((content, empty)).parse(input)
 }
 
 pub(crate) fn parse_next_token(input: Span) -> IResult<Span, Token> {
@@ -159,45 +165,48 @@ pub(crate) fn parse_next_token(input: Span) -> IResult<Span, Token> {
             map(float, Token::Float),
             map(string, |val| Token::String(val.to_string())),
         )),
-    )(input)
+    )
+    .parse(input)
 }
 
 pub(crate) fn parse_trailing_characters(input: Span) -> IResult<Span, ()> {
-    value((), optional)(input)
+    value((), optional).parse(input)
 }
 
 pub(crate) fn parse_null(input: Span) -> IResult<Span, Token> {
-    preceded(optional, value(Token::Null, null))(input)
+    preceded(optional, value(Token::Null, null)).parse(input)
 }
 
 pub(crate) fn parse_separator(input: Span) -> IResult<Span, Token> {
     preceded(
         opt(horizontal_whitespace),
         value(Token::Separator, separator),
-    )(input)
+    )
+    .parse(input)
 }
 
 pub(crate) fn parse_bool(input: Span) -> IResult<Span, Token> {
-    preceded(optional, map(bool, Token::Boolean))(input)
+    preceded(optional, map(bool, Token::Boolean)).parse(input)
 }
 
 pub(crate) fn parse_integer(input: Span) -> IResult<Span, Token> {
-    preceded(optional, map(integer, Token::Integer))(input)
+    preceded(optional, map(integer, Token::Integer)).parse(input)
 }
 
 pub(crate) fn parse_float(input: Span) -> IResult<Span, Token> {
-    preceded(optional, map(float, Token::Float))(input)
+    preceded(optional, map(float, Token::Float)).parse(input)
 }
 
 pub(crate) fn parse_identifier(input: Span) -> IResult<Span, Token> {
     preceded(
         optional,
         map(identifier, |val| Token::String(val.to_string())),
-    )(input)
+    )
+    .parse(input)
 }
 
 pub(crate) fn parse_string(input: Span) -> IResult<Span, Token> {
-    preceded(optional, map(string, |val| Token::String(val.to_string())))(input)
+    preceded(optional, map(string, |val| Token::String(val.to_string()))).parse(input)
 }
 
 #[cfg(test)]

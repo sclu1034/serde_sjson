@@ -11,6 +11,10 @@ run *ARGS:
 test *ARGS:
     cargo test {{ARGS}}
 
+check:
+    cargo clippy -- -D warnings
+    cargo test
+
 doc:
     cargo doc --no-deps
     cargo readme > README.md
@@ -18,8 +22,13 @@ doc:
 serve-doc port='8000': doc
     python3 -m http.server {{port}} --directory target/doc
 
-release version execute='':
-    cargo release --sign --allow-branch master {{ if execute != "" { '-x' } else { '' } }} {{version}}
+release version execute='': check build doc
+    git fetch --all
+    [ "$(git rev-parse master)" = "$(git rev-parse origin/master)" ] \
+        || (echo "error: master and origin/master differ" >&2; exit 1)
+    git branch -f release master
+    git checkout release
+    cargo release --sign --allow-branch release {{ if execute != "" { '-x' } else { '' } }} {{version}}
 
 coverage *ARGS:
     RUSTFLAGS="-C instrument-coverage" cargo test --tests {{ARGS}} || true

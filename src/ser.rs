@@ -84,7 +84,7 @@ where
     }
 }
 
-impl<'a, W> serde::ser::Serializer for &'a mut Serializer<W>
+impl<W> serde::ser::Serializer for &mut Serializer<W>
 where
     W: io::Write,
 {
@@ -216,9 +216,9 @@ where
         self.serialize_unit()
     }
 
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok>
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         self.ensure_top_level_struct()?;
 
@@ -245,9 +245,9 @@ where
         self.serialize_str(variant)
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(self, _name: &'static str, value: &T) -> Result<Self::Ok>
+    fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result<Self::Ok>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         self.ensure_top_level_struct()?;
 
@@ -255,7 +255,7 @@ where
     }
 
     // Serialize an externally tagged enum: `{ NAME = VALUE }`.
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         _name: &'static str,
         _variant_index: u32,
@@ -263,7 +263,7 @@ where
         value: &T,
     ) -> Result<Self::Ok>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         self.ensure_top_level_struct()?;
 
@@ -345,24 +345,24 @@ where
         Ok(self)
     }
 
-    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok>
+    fn collect_str<T>(self, value: &T) -> Result<Self::Ok>
     where
-        T: std::fmt::Display,
+        T: std::fmt::Display + ?Sized,
     {
         self.serialize_str(&value.to_string())
     }
 }
 
-impl<'a, W> serde::ser::SerializeSeq for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeSeq for &mut Serializer<W>
 where
     W: io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         value.serialize(&mut **self)?;
@@ -376,16 +376,16 @@ where
     }
 }
 
-impl<'a, W> serde::ser::SerializeTuple for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeTuple for &mut Serializer<W>
 where
     W: io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         value.serialize(&mut **self)?;
@@ -399,16 +399,16 @@ where
     }
 }
 
-impl<'a, W> serde::ser::SerializeTupleStruct for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeTupleStruct for &mut Serializer<W>
 where
     W: io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         value.serialize(&mut **self)?;
@@ -422,16 +422,16 @@ where
     }
 }
 
-impl<'a, W> serde::ser::SerializeTupleVariant for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeTupleVariant for &mut Serializer<W>
 where
     W: io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         value.serialize(&mut **self)?;
@@ -454,24 +454,24 @@ where
     }
 }
 
-impl<'a, W> serde::ser::SerializeMap for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeMap for &mut Serializer<W>
 where
     W: io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<()>
+    fn serialize_key<T>(&mut self, key: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         key.serialize(&mut **self)
     }
 
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<()>
+    fn serialize_value<T>(&mut self, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         // It doesn't make a difference where the `=` is added. But doing it here
         // means `serialize_key` is only a call to a different function, which should
@@ -491,16 +491,16 @@ where
     }
 }
 
-impl<'a, W> serde::ser::SerializeStruct for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeStruct for &mut Serializer<W>
 where
     W: io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         key.serialize(&mut **self)?;
@@ -521,16 +521,16 @@ where
     }
 }
 
-impl<'a, W> serde::ser::SerializeStructVariant for &'a mut Serializer<W>
+impl<W> serde::ser::SerializeStructVariant for &mut Serializer<W>
 where
     W: std::io::Write,
 {
     type Ok = ();
     type Error = Error;
 
-    fn serialize_field<T: ?Sized>(&mut self, key: &'static str, value: &T) -> Result<()>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         self.add_indent()?;
         key.serialize(&mut **self)?;
