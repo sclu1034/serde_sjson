@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [1.2.1] - 2025-04-21
+
 ### Changed
 
 - update [nom](https://crates.io/crates/nom) to v8
