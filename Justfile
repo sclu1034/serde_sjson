@@ -26,9 +26,7 @@ release version execute='': check build doc
     git fetch --all
     [ "$(git rev-parse master)" = "$(git rev-parse origin/master)" ] \
         || (echo "error: master and origin/master differ" >&2; exit 1)
-    git branch -f release master
-    git checkout release
-    cargo release --sign --allow-branch release {{ if execute != "" { '-x' } else { '' } }} {{version}}
+    cargo release --sign --allow-branch master {{ if execute != "" { '-x' } else { '' } }} {{version}}
 
 coverage *ARGS:
     RUSTFLAGS="-C instrument-coverage" cargo test --tests {{ARGS}} || true
