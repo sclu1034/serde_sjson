@@ -565,3 +565,23 @@ fn serialize_option_string() {
         String::from("value = \"foo bar\"\n")
     );
 }
+
+// Strings containing characters that terminate an unquoted string must be
+// quoted, so that they survive a round trip.
+#[test]
+fn serialize_string_with_structural_characters() {
+    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    struct Value {
+        value: String,
+    }
+
+    for raw in ["a,b", "a[b", "a]b", "a{b", "a}b"] {
+        let value = Value {
+            value: String::from(raw),
+        };
+
+        let actual = to_string(&value).unwrap();
+        assert_eq!(actual, format!("value = \"{raw}\"\n"));
+        assert_eq!(serde_sjson::from_str::<Value>(&actual).unwrap(), value);
+    }
+}

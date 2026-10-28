@@ -7,6 +7,7 @@
 ### Fixed
 
 - fix parsing arrays whose elements are separated by whitespace
+- fix unquoted strings consuming `,`, `[`, `]`, `{` and `}`
 
 ## [1.2.1] - 2025-04-21
 
