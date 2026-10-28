@@ -80,12 +80,12 @@ fn serialize_non_representable_floats() {
         value: f32,
     }
 
-    let tests = [std::f64::NAN, std::f64::INFINITY, std::f64::NEG_INFINITY];
+    let tests = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
     for value in tests {
         let value = Value64 { value };
         assert!(to_string(&value).is_err());
     }
-    let tests = [std::f32::NAN, std::f32::INFINITY, std::f32::NEG_INFINITY];
+    let tests = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY];
     for value in tests {
         let value = Value32 { value };
         assert!(to_string(&value).is_err());
@@ -564,4 +564,24 @@ fn serialize_option_string() {
         to_string(&value).unwrap(),
         String::from("value = \"foo bar\"\n")
     );
+}
+
+// Strings containing characters that terminate an unquoted string must be
+// quoted, so that they survive a round trip.
+#[test]
+fn serialize_string_with_structural_characters() {
+    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    struct Value {
+        value: String,
+    }
+
+    for raw in ["a,b", "a[b", "a]b", "a{b", "a}b"] {
+        let value = Value {
+            value: String::from(raw),
+        };
+
+        let actual = to_string(&value).unwrap();
+        assert_eq!(actual, format!("value = \"{raw}\"\n"));
+        assert_eq!(serde_sjson::from_str::<Value>(&actual).unwrap(), value);
+    }
 }

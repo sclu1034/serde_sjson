@@ -160,8 +160,12 @@ where
     fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         self.ensure_top_level_struct()?;
 
-        let needs_quotes =
-            v.is_empty() || v.contains([' ', '\n', '\r', '\t', '=', '\'', '"', '\\', ':']);
+        // Must cover every character that terminates an unquoted string in the
+        // parser, or the value won't survive a round trip.
+        let needs_quotes = v.is_empty()
+            || v.contains([
+                ' ', '\n', '\r', '\t', '=', '\'', '"', '\\', ':', ',', '[', ']', '{', '}',
+            ]);
 
         if needs_quotes {
             self.write(b"\"")?;
