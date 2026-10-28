@@ -4,6 +4,10 @@
 
 ## [Unreleased] - ReleaseDate
 
+### Fixed
+
+- fix parsing arrays whose elements are separated by whitespace
+
 ## [1.2.1] - 2025-04-21
 
 ### Changed

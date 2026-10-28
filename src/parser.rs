@@ -1,8 +1,8 @@
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::character::complete::{char, digit1, none_of, not_line_ending, one_of};
-use nom::combinator::{cut, eof, map, map_res, opt, recognize, value};
-use nom::multi::many1_count;
+use nom::combinator::{cut, eof, map, map_res, opt, recognize, value, verify};
+use nom::multi::{many0_count, many1_count};
 use nom::number::complete::double;
 use nom::sequence::{delimited, preceded, terminated};
 use nom::{IResult, Input as _, Parser as _};
@@ -61,9 +61,12 @@ fn float(input: Span) -> IResult<Span, f64> {
 }
 
 fn identifier(input: Span<'_>) -> IResult<Span<'_>, &str> {
-    map(recognize(many1_count(none_of("\" \t\n=:"))), |val: Span| {
-        *val.fragment()
-    })
+    // An unquoted string ends at any character that carries structural meaning,
+    // so that `[a b]` or `{a = b}` don't swallow the closing delimiter.
+    map(
+        recognize(many1_count(none_of("\" \t\r\n=:,[]{}"))),
+        |val: Span| *val.fragment(),
+    )
     .parse(input)
 }
 
@@ -181,6 +184,28 @@ pub(crate) fn parse_separator(input: Span) -> IResult<Span, Token> {
     preceded(
         opt(horizontal_whitespace),
         value(Token::Separator, separator),
+    )
+    .parse(input)
+}
+
+// Unlike object fields, array elements may also be separated by plain
+// whitespace, which makes `[1 2 3]` and `[1, 2, 3]` equivalent. At most one
+// comma may take part, so that `[1,, 2]` stays an error rather than silently
+// dropping an empty element.
+pub(crate) fn parse_array_separator(input: Span) -> IResult<Span, Token> {
+    let ignorable = || {
+        value(
+            (),
+            many0_count(alt((value((), whitespace), value((), comment)))),
+        )
+    };
+
+    value(
+        Token::Separator,
+        verify(
+            recognize((ignorable(), opt(char(',')), ignorable())),
+            |val: &Span| !val.fragment().is_empty(),
+        ),
     )
     .parse(input)
 }
@@ -317,6 +342,9 @@ mod test {
         assert_ok!("foo-bar", identifier, "", "foo-bar");
         assert_ok!("foo/bar", identifier, "", "foo/bar");
         assert_ok!("foo\"", identifier, "\"", "foo");
+        assert_ok!("foo]", identifier, "]", "foo");
+        assert_ok!("foo,bar", identifier, ",bar", "foo");
+        assert_ok!("foo}", identifier, "}", "foo");
 
         assert_err!("\"foo", identifier, ErrorKind::Many1Count);
         assert_err!("\"foo\"", identifier, ErrorKind::Many1Count);
@@ -404,6 +432,51 @@ Escape sequences, like \n and \t, are parsed literally.
     fn parse_block_comment() {
         assert_ok!("/* foo */", block_comment, "", " foo ");
         assert_ok!("/*\n\tfoo\nbar\n*/", block_comment, "", "\n\tfoo\nbar\n");
+    }
+
+    #[test]
+    fn parse_vec() {
+        check_parse_result(
+            "[1, 2, 3]",
+            [
+                Token::ArrayStart,
+                Token::Integer(1),
+                Token::Separator,
+                Token::Integer(2),
+                Token::Separator,
+                Token::Integer(3),
+                Token::ArrayEnd,
+            ],
+        );
+        check_parse_result(
+            "[1 2 3]",
+            [
+                Token::ArrayStart,
+                Token::Integer(1),
+                Token::Integer(2),
+                Token::Integer(3),
+                Token::ArrayEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_array_separator() {
+        assert_ok!(" ", parse_array_separator, "", Token::Separator);
+        assert_ok!(",", parse_array_separator, "", Token::Separator);
+        assert_ok!(" , ", parse_array_separator, "", Token::Separator);
+        assert_ok!("\n", parse_array_separator, "", Token::Separator);
+        assert_ok!("\r\n\t", parse_array_separator, "", Token::Separator);
+        assert_ok!(" /* c */ ", parse_array_separator, "", Token::Separator);
+        assert_ok!(" 2]", parse_array_separator, "2]", Token::Separator);
+        assert_ok!(", 2]", parse_array_separator, "2]", Token::Separator);
+
+        // A second comma is not part of the separator, so the caller sees it as
+        // an (invalid) element.
+        assert_ok!(",,", parse_array_separator, ",", Token::Separator);
+
+        assert_err!("2]", parse_array_separator, ErrorKind::Verify);
+        assert_err!("]", parse_array_separator, ErrorKind::Verify);
     }
 
     // Regression test for #1 (https://git.sclu1034.dev/lucas/serde_sjson/issues/1)

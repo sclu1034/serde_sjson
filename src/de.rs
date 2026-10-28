@@ -432,8 +432,11 @@ impl<'de> serde::de::SeqAccess<'de> for Separated<'_, 'de> {
             return Ok(None);
         }
 
-        if !self.first && self.de.parse(&parse_separator)? != Token::Separator {
-            return Err(self.de.error(ErrorCode::ExpectedArraySeparator));
+        if !self.first {
+            match parse_array_separator(self.de.input) {
+                Ok((span, _)) => self.de.input = span,
+                Err(_) => return Err(self.de.error(ErrorCode::ExpectedArraySeparator)),
+            }
         }
 
         self.first = false;
@@ -636,6 +639,64 @@ mod test {
     3
 ]"
         );
+        assert_value_ok!(Vec<u64>, vec![1, 2, 3], "[1 2 3]");
+        assert_value_ok!(Vec<String>, vec!["a".to_string(), "b".to_string()], "[a b]");
+        assert_value_ok!(
+            Vec<String>,
+            vec!["a".to_string(), "b".to_string()],
+            "[a, b]"
+        );
+    }
+
+    #[test]
+    fn deserialize_malformed_vec() {
+        macro_rules! assert_vec_err {
+            ($json:expr) => {{
+                #[derive(Debug, serde::Deserialize, PartialEq)]
+                struct Value {
+                    value: Vec<String>,
+                }
+
+                let json = format!("value = {}", $json);
+                assert!(
+                    from_str::<Value>(&json).is_err(),
+                    "expected {:?} to fail to parse",
+                    $json
+                );
+            }};
+        }
+
+        // Missing separators must not be papered over by the whitespace rule.
+        assert_vec_err!(r#"["a""b"]"#);
+        assert_vec_err!(r#"[a"b"]"#);
+        assert_vec_err!("[[a] [b]]");
+
+        // Empty elements.
+        assert_vec_err!("[,a]");
+        assert_vec_err!("[a,, b]");
+        assert_vec_err!("[a, , b]");
+        assert_vec_err!("[a, b,]");
+        assert_vec_err!("[a b,]");
+
+        // Unterminated.
+        assert_vec_err!("[a b");
+        assert_vec_err!("[a, b");
+
+        // Trailing content after the array.
+        assert_vec_err!("[a b] c");
+    }
+
+    // Whitespace separates array elements, but must not separate object fields.
+    #[test]
+    fn deserialize_space_separated_fields() {
+        #[derive(Debug, serde::Deserialize, PartialEq)]
+        struct Data {
+            a: u64,
+            b: u64,
+        }
+
+        assert!(from_str::<Data>("a = 1 b = 2").is_err());
+        assert_ok!(Data, Data { a: 1, b: 2 }, "a = 1\nb = 2");
     }
 
     #[test]
