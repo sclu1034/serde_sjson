@@ -38,7 +38,7 @@ fn null(input: Span) -> IResult<Span, ()> {
     value((), tag("null")).parse(input)
 }
 
-fn separator(input: Span) -> IResult<Span, &str> {
+fn separator(input: Span<'_>) -> IResult<Span<'_>, &str> {
     map(alt((tag(","), tag("\n"), tag("\r\n"))), |val: Span| {
         *val.fragment()
     })
@@ -60,14 +60,14 @@ fn float(input: Span) -> IResult<Span, f64> {
     double(input)
 }
 
-fn identifier(input: Span) -> IResult<Span, &str> {
+fn identifier(input: Span<'_>) -> IResult<Span<'_>, &str> {
     map(recognize(many1_count(none_of("\" \t\n=:"))), |val: Span| {
         *val.fragment()
     })
     .parse(input)
 }
 
-fn literal_string(input: Span) -> IResult<Span, &str> {
+fn literal_string(input: Span<'_>) -> IResult<Span<'_>, &str> {
     map(
         delimited(tag("\"\"\""), take_until("\"\"\""), tag("\"\"\"")),
         |val: Span| *val.fragment(),
@@ -75,7 +75,7 @@ fn literal_string(input: Span) -> IResult<Span, &str> {
     .parse(input)
 }
 
-fn string_content(input: Span) -> IResult<Span, &str> {
+fn string_content(input: Span<'_>) -> IResult<Span<'_>, &str> {
     let buf = input.fragment();
     let mut escaped = false;
     let mut i = 0;
@@ -107,15 +107,15 @@ fn string_content(input: Span) -> IResult<Span, &str> {
     Err(nom::Err::Failure(err))
 }
 
-fn delimited_string(input: Span) -> IResult<Span, &str> {
+fn delimited_string(input: Span<'_>) -> IResult<Span<'_>, &str> {
     preceded(char('"'), cut(terminated(string_content, char('"')))).parse(input)
 }
 
-fn string(input: Span) -> IResult<Span, &str> {
+fn string(input: Span<'_>) -> IResult<Span<'_>, &str> {
     alt((identifier, literal_string, delimited_string)).parse(input)
 }
 
-fn line_comment(input: Span) -> IResult<Span, &str> {
+fn line_comment(input: Span<'_>) -> IResult<Span<'_>, &str> {
     map(
         preceded(tag("//"), alt((not_line_ending, eof))),
         |val: Span| *val.fragment(),
@@ -123,7 +123,7 @@ fn line_comment(input: Span) -> IResult<Span, &str> {
     .parse(input)
 }
 
-fn block_comment(input: Span) -> IResult<Span, &str> {
+fn block_comment(input: Span<'_>) -> IResult<Span<'_>, &str> {
     map(
         delimited(tag("/*"), take_until("*/"), tag("*/")),
         |val: Span| *val.fragment(),
@@ -131,7 +131,7 @@ fn block_comment(input: Span) -> IResult<Span, &str> {
     .parse(input)
 }
 
-fn comment(input: Span) -> IResult<Span, &str> {
+fn comment(input: Span<'_>) -> IResult<Span<'_>, &str> {
     alt((line_comment, block_comment)).parse(input)
 }
 
@@ -254,7 +254,7 @@ mod test {
             assert_eq!(Some(&token), tokens.get(i));
 
             remaining = span;
-            i = i + 1;
+            i += 1;
         }
 
         assert_eq!(
@@ -295,6 +295,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)]
     fn parse_float() {
         assert_ok!("3", float, "", 3.0);
         assert_ok!("3.0", float, "", 3.0);

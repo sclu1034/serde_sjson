@@ -80,12 +80,12 @@ fn serialize_non_representable_floats() {
         value: f32,
     }
 
-    let tests = [std::f64::NAN, std::f64::INFINITY, std::f64::NEG_INFINITY];
+    let tests = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
     for value in tests {
         let value = Value64 { value };
         assert!(to_string(&value).is_err());
     }
-    let tests = [std::f32::NAN, std::f32::INFINITY, std::f32::NEG_INFINITY];
+    let tests = [f32::NAN, f32::INFINITY, f32::NEG_INFINITY];
     for value in tests {
         let value = Value32 { value };
         assert!(to_string(&value).is_err());
