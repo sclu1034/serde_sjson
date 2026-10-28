@@ -4,6 +4,8 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [1.2.2] - 2026-10-28
+
 ### Fixed
 
 - fix parsing arrays whose elements are separated by whitespace
